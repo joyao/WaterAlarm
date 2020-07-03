@@ -1,0 +1,295 @@
+﻿<!DOCTYPE html>
+<html lang="zh-tw">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>橋梁水情預警系統</title>
+    <link rel="shortcut icon" href="./images/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="./images/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/fontello/css/fontello.css">
+    <link href="https://fonts.googleapis.com/css2?family=MuseoModerno:wght@800&family=Noto+Serif+TC:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://js.arcgis.com/4.15/esri/css/main.css">
+    <script src="js/proj4.js"></script>
+    <script src="https://js.arcgis.com/4.15/"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+            integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+            crossorigin="anonymous"></script>
+    <script>
+        var map;
+        var view;
+        var pointGraphic;
+        var esri = require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/WebTileLayer",
+            "esri/layers/TileLayer",
+            "esri/Basemap",
+            "esri/layers/FeatureLayer",
+            "esri/widgets/Search",
+            "esri/Graphic",
+            "esri/layers/GraphicsLayer",
+            "esri/geometry/Point",
+            "esri/geometry/Polygon",
+            "esri/geometry/SpatialReference",
+            "esri/widgets/ScaleBar",
+            "esri/geometry/Extent"
+        ], function (Map, MapView, WebTileLayer, TileLayer, Basemap, FeatureLayer, Search, Graphic, GraphicsLayer, Point, Polygon, SpatialReference, ScaleBar, Extent) {
+
+            //加入底圖
+            var mybasemap = new Basemap({
+                baseLayers: [
+                    new TileLayer({
+                        url: "https://map.hl.gov.tw/arcgis/rest/services/HuBaseMap/MapServer",
+                        title: "Basemap"
+                    })
+                ],
+                title: "basemap",
+                id: "basemap"
+            });
+
+            map = new Map({
+                basemap: mybasemap
+            });
+
+            view = new MapView({
+                container: "esri-map",
+                map: map,
+                extent: new Extent({
+                    xmin: 300476,
+                    ymin: 2647621,
+                    xmax: 320849,
+                    ymax: 2659315,
+                    spatialReference: {
+                        wkid: 3826
+                    }
+                }),
+                zoom: 8
+
+            });
+            view.goTo({                            // go to point with a custom animation duration
+                target: {
+                    center: [315112, 2653340]
+                },
+                duration: 10000
+            });
+
+            //view.scale = 10000;
+            //view.extent = new Extent({
+            //    xmin: 102164,
+            //    ymin: 2510034,
+            //    xmax: 514121,
+            //    ymax: 2742868,
+            //    spatialReference: {
+            //        wkid: 3826
+            //    }
+            //});
+
+            //比例尺
+            var scaleBar_bottom = new ScaleBar({
+                view: view,
+                unit: "metric"
+            });
+            // Add widget to the bottom right corner of the view
+            view.ui.add(scaleBar_bottom, {
+                position: "bottom-right"
+
+            });
+
+            //加入橋梁圖層 //
+            var BridgeLayer_25000 = new FeatureLayer({
+                url: "https://map.hl.gov.tw/arcgis/rest/services/HLWarehouse/bridge/MapServer/0"
+            });
+            var BridgeLayer = new FeatureLayer({
+                url: "https://map.hl.gov.tw/arcgis/rest/services/HLWarehouse/bridge/MapServer/1"
+            });
+
+
+            map.add(BridgeLayer_25000);
+            map.add(BridgeLayer);
+
+            //加入popup
+            var popupBridge = {
+                "title": "{橋梁名稱}",
+                "content": "<b>管理機關:</b> {管理機關}<br><b>轄下機關:</b> {轄下機關}<br><b>所在區鄉:</b> {所在區鄉}"
+            }
+
+            var Bridge = new FeatureLayer({
+                url: "https://map.hl.gov.tw/arcgis/rest/services/HLWarehouse/bridge/MapServer",
+                outFields: ["橋梁名稱", "管理機關", "轄下機關", "所在區鄉"],
+                popupTemplate: popupBridge
+            });
+
+            map.add(Bridge);
+
+            //搜尋橋梁
+            var searchwidget = new Search({
+                view: view,
+                includeDefaultSources: false,
+                maxSuggestions: 7
+            });
+
+            view.ui.add(searchwidget, "top-right");
+            //search.locationEnabled = false;
+
+
+            searchwidget.sources.push({
+                layer: BridgeLayer,
+                searchFields: ["橋梁名稱"],
+                displayField: "橋梁名稱",
+                exactMatch: false,
+                outFields: ["橋梁名稱", "轄下機關"],
+                resultGraphicEnabled: true,
+                name: "橋梁",
+                placeholder: "請輸入欲搜尋之橋梁關鍵字",
+                autoSelect: 1,
+                locationEnabled: 0,
+
+            });
+
+            //const sources = [
+            //    {
+            //        layer: BridgeLayer,
+            //        searchFields: ["橋梁名稱"],
+            //        displayField: "橋梁名稱",
+            //        exactMatch: false,
+            //        outFields: ["橋梁名稱", "轄下機關"],
+            //        resultGraphicEnabled: true,
+            //        name: "橋梁",
+            //        placeholder: "請輸入欲搜尋之橋梁關鍵字",
+            //        autoSelect: 1,
+            //    }
+            //];
+
+            //searchWidget.sources = sources;
+
+            const sr3826 = new SpatialReference({ wkid: 3826 });
+
+            //繪圖
+            var graphicsLayer_alertBridges = new GraphicsLayer({ id: 'alertBridgesLyr' });
+            map.add(graphicsLayer_alertBridges);
+
+            //定義proj4的坐標系統
+            proj4.defs("EPSG:3826", "+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+            proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
+
+            var wraurl = "http://fhy.wra.gov.tw/WraApi/v1/Water/Station?$filter=CityCode%20eq%20'10015'";
+            $.ajax({
+                type: 'GET',
+                url: wraurl,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (response) {
+                    console.log(response);
+                    var waterstation = response;
+                    var wlurl = 'http://fhy.wra.gov.tw/WraApi/v1/Water/RealTimeInfo';
+                    $.ajax({
+                        type: 'GET',
+                        url: wlurl,
+                        contentType: 'application/json; charset=utf-8',
+                        dataType: 'json',
+                        success: function (wlresponse) {
+                            console.log(wlresponse);
+                            var waterlevel = wlresponse;
+                            //迴圈組html
+                            var Lv1alertstr = "";
+                            var Lv2alertstr = "";
+                            for (i = 0; i < waterstation.length; i++) {
+                                var StationNo = waterstation[i].StationNo; //取得特定測站代碼
+                                var wltemp = waterlevel.filter(item => item.StationNo == StationNo); //取得對應測站之waterlevel資料
+                                //判斷filter後有沒有資料
+                                if (wltemp.length !== 0) {
+                                    var warninglight;
+                                    var point = {
+                                        type: "point",  // autocasts as new Point()
+                                        longitude: waterstation[i].Longitude,
+                                        latitude: waterstation[i].Latitude
+                                    };
+                                    if (parseFloat(wltemp[0].WaterLevel) > parseFloat(waterstation[i].WarningLevel1) || [13].includes(i)) {
+                                        warninglight = "red";
+                                        pointGraphic = new Graphic({
+                                            geometry: point,
+                                            symbol: {
+                                                type: "simple-marker", 
+                                                color: [239, 91, 123, 0.7],
+                                                size: 50,
+                                                outline: { 
+                                                    width: 0.5,
+                                                    color: [255, 0, 0]
+                                                }
+                                            }
+                                        });
+                                        graphicsLayer_alertBridges.add(pointGraphic)
+                                        Lv1alertstr += waterstation[i].StationName + "  ";
+                                    }
+                                    else if (parseFloat(wltemp[0].WaterLevel) > parseFloat(waterstation[i].WarningLevel2) || [2, 12].includes(i)) {
+                                        warninglight = "orange";
+                                        pointGraphic = new Graphic({
+                                            geometry: point,
+                                            symbol: {
+                                                type: "simple-marker",  // autocasts as new SimpleMarkerSymbol()
+                                                color: [255, 192, 0, 0.7],
+                                                size: 50,
+                                                outline: { // autocasts as new SimpleLineSymbol()
+                                                    width: 0.5,
+                                                    color: [255, 153, 0]
+                                                }
+                                            }
+                                        });
+                                        graphicsLayer_alertBridges.add(pointGraphic)
+                                        Lv2alertstr += waterstation[i].StationName + "  ";
+                                    }
+                                    else {
+                                        warninglight = "green";
+
+                                    }
+                                    var waterliststr = '<div class="list"><div class="list__light list__light--' + warninglight + '"></div><div class="list__content"><div class="list__title">' + waterstation[i].StationName + '</div><div class="list__text">水位高：' + wltemp[0].WaterLevel + ' 公尺</div><div class="list__btn icon-marker-1" onclick="locateWaterLevel(' + waterstation[i].Longitude + ',' + waterstation[i].Latitude + ')"></div></div></div>';
+                                    $("#main-list").append(waterliststr)
+                                }
+                                if (i == waterstation.length - 1 && Lv1alertstr !== "" && Lv2alertstr !== "") {
+                                    alert("水位值一級警戒：\n" + Lv1alertstr + "\n水位值二級警戒：\n" + Lv2alertstr);
+                                }
+                            }
+                            console.log(waterstation)
+
+
+                        }
+                    });
+                }
+            });
+        });
+        function locateWaterLevel(x, y) {
+            var point3826 = proj4("EPSG:4326", "EPSG:3826", [x, y]);
+            var point = {
+                type: "point",
+                x: point3826[0],
+                y: point3826[1],
+                spatialReference: 3826
+            };
+            view.center = point;
+            view.zoom = 8
+        }
+    </script>
+</head>
+
+<body>
+    <div id="main-frame">
+        <div id="main-content">
+            <div id="main-title">
+                <h1>橋梁水情預警系統</h1>
+                <div class="author">Made by yuan.</div>
+            </div>
+            <div id="main-list">
+            </div>
+
+
+        </div>
+        <div id="main-map">
+            <div id="esri-map" style="height: 100%;"></div>
+        </div>
+    </div>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,105 @@
+﻿<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>ArcGIS API for JavaScript Hello World App</title>
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.15/esri/css/main.css">
+    <script src="https://js.arcgis.com/4.15/"></script>
+
+    <script>
+        alert('Hello AAA');
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/WebTileLayer",
+            "esri/layers/TileLayer",
+            "esri/Basemap",
+            "esri/layers/FeatureLayer",
+            "esri/widgets/Search",
+
+        ], function (Map, MapView, WebTileLayer, TileLayer, Basemap, FeatureLayer, Search) {
+
+            var basemap = new Basemap({
+                baseLayers: [
+                    new TileLayer({
+                        url: "https://map.hl.gov.tw/arcgis/rest/services/HuBaseMap/MapServer",
+                        title: "Basemap"
+                    })
+                ],
+                title: "basemap",
+                id: "basemap"
+            });
+
+
+
+            var map = new Map({
+                basemap: basemap
+            });
+
+
+
+            var view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [312128, 2655262],
+                zoom: 4
+            });
+
+            //加入橋梁圖層
+            var BridgeLayer = new FeatureLayer({
+                url: "https://map.hl.gov.tw/arcgis/rest/services/HLWarehouse/bridge/MapServer/0"
+            });
+
+            map.add(BridgeLayer);
+
+            //加入popup
+            var popupBridge = {
+                "title": "{橋梁名稱}",
+                "content": "<b>管理機關:</b> {管理機關}<br><b>轄下機關:</b> {轄下機關}<br><b>所在區鄉:</b> {所在區鄉}"
+            }
+
+            var Bridge = new FeatureLayer({
+                url: "https://map.hl.gov.tw/arcgis/rest/services/HLWarehouse/bridge/MapServer/0",
+                outFields: ["橋梁名稱", "管理機關", "轄下機關", "所在區鄉"],
+                popupTemplate: popupBridge
+            });
+
+                map.add(Bridge);
+
+            //搜尋橋梁
+            var search = new Search({
+                view: view
+            });
+
+            view.ui.add(search, "top-right");
+
+            search.sources.push({
+                layer: BridgeLayer,
+                searchFields: ["橋梁名稱"],
+                displayField: "橋梁名稱",
+                exactMatch: false,
+                outFields: ["橋梁名稱", "轄下機關"],
+                resultGraphicEnabled: true,
+                name: "橋梁",
+                placeholder: "請輸入欲搜尋之橋梁關鍵字",
+                autoSelect: 1,
+
+            });
+
+
+        });
+    </script>
+</head>
+<body>
+    <div id="viewDiv"></div>
+</body>
+</html>
